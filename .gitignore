@@ -1,0 +1,32 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Output kết quả test
+json_output/
+*.json
+runs/
+
+# File nặng (Model weights & datasets)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.bin
+weights/
+weight/
+
+# File tài liệu tạm dùng test
+*.pdf
+*.jpg
+*.jpeg
+*.png
+
+# Môi trường ảo & IDE
+.venv/
+env/
+venv/
+.vscode/
+.idea/
