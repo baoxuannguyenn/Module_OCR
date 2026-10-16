@@ -1,0 +1,23 @@
+# Cấu hình hệ thống OCR Pipeline
+
+# === Thiết bị phần cứng ===
+device: "cuda"  # 'cuda' hoặc 'cpu'
+
+# === Phát hiện chữ (YOLO Word Detection) ===
+detector:
+  model_path: "E:/SGOD/21_9_2026/weight/best_yolo_ep100.pt"
+  conf_thres: 0.25
+  iou_thres: 0.45
+  imgsz: 1024
+
+# === Nhận diện chữ (VietOCR) ===
+recognizer:
+  config_base: "vgg_transformer"  # 'vgg_transformer' hoặc 'vgg_seq2seq'
+  weight_path: "E:/SGOD/21_9_2026/weight/vgg_transformer_best.pth"  # Đường dẫn file weight fine-tune
+  beamsearch: false
+
+# === Xử lý sắp xếp thứ tự đọc (Box Sorter) ===
+sorting:
+  y_threshold_ratio: 0.5   # Tỷ lệ chênh lệch trục Y để gom các từ vào cùng 1 dòng
+  line_break: true         # Tự động ngắt dòng (\n) giữa các dòng văn bản
+
