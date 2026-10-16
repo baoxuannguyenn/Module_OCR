@@ -29,7 +29,7 @@ class OCRPipeline:
         self.det_iou = det_cfg.get("iou_thres", 0.45)
         self.det_imgsz = det_cfg.get("imgsz", 1024)
         
-        print(f"📦 [OCR] Khởi tạo YOLO Detector: {det_model_path} (Device: {self.device})")
+        print(f"[OCR] Khởi tạo YOLO Detector: {det_model_path} (Device: {self.device})")
         self.detector = WordDetector(
             model_path=det_model_path,
             device=self.device,
@@ -42,7 +42,7 @@ class OCRPipeline:
         rec_base = rec_cfg.get("config_base", "vgg_transformer")
         rec_weight = rec_cfg.get("weight_path", None)
         
-        print(f"📦 [OCR] Khởi tạo VietOCR ({rec_base}): {rec_weight} (Device: {self.device})")
+        print(f"[OCR] Khởi tạo VietOCR ({rec_base}): {rec_weight} (Device: {self.device})")
         self.recognizer = TextRecognizer(
             config_base=rec_base,
             weight_path=rec_weight,
@@ -144,10 +144,9 @@ class OCRPipeline:
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"Không tìm thấy file PDF tại: {pdf_path}")
 
-        print(f"📄 Đang nạp file PDF: {pdf_path}")
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
-        print(f"📑 Tổng số trang: {total_pages}")
+        print(f"Tổng số trang: {total_pages}")
 
         pages_result = []
         all_page_texts = []
@@ -155,7 +154,7 @@ class OCRPipeline:
 
         for page_idx in range(total_pages):
             page_num = page_idx + 1
-            print(f"⏳ Đang xử lý trang {page_num}/{total_pages}...")
+            print(f"Đang xử lý trang {page_num}/{total_pages}...")
             page = doc[page_idx]
 
             # Render trang PDF ra Pixmap với DPI mong muốn
@@ -208,4 +207,4 @@ class OCRPipeline:
         os.makedirs(os.path.dirname(os.path.abspath(json_path)), exist_ok=True)
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        print(f"💾 Đã lưu kết quả OCR vào: {json_path}")
+        print(f"Đã lưu kết quả OCR vào: {json_path}")
