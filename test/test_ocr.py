@@ -1,6 +1,5 @@
 import os
 import sys
-from pipeline.ocr_pipeline import OCRPipeline
 
 # Thêm thư mục gốc 'sgod_model_ocr' vào sys.path để import được pipeline, model, utils
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -8,6 +7,8 @@ project_root = os.path.abspath(os.path.join(current_dir, ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 os.chdir(project_root)
+
+from pipeline.ocr_pipeline import OCRPipeline
 
 # Khởi tạo tự động đọc từ config/ocr.yaml
 pipeline = OCRPipeline(config_path="config/ocr.yaml")

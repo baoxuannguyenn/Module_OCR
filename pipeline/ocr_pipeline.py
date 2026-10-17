@@ -149,8 +149,7 @@ class OCRPipeline:
         print(f"Tổng số trang: {total_pages}")
 
         pages_result = []
-        all_page_texts = []
-        all_lines = []
+        content_by_pages = []
 
         for page_idx in range(total_pages):
             page_num = page_idx + 1
@@ -169,18 +168,25 @@ class OCRPipeline:
 
             # Chạy OCR cho trang ảnh này
             page_res = self.predict_image(img)
-            page_res["page"] = page_num
-            pages_result.append(page_res)
             
-            if page_res["full_text"]:
-                all_page_texts.append(page_res["full_text"])
-            all_lines.extend(page_res.get("lines", []))
+            # Lưu content và lines chuẩn theo từng trang
+            content_by_pages.append({
+                "page": page_num,
+                "content": page_res.get("full_text", ""),
+                "lines": page_res.get("lines", [])
+            })
+
+            # pages chỉ lưu thông tin tọa độ/kết quả từ (box, score, text) để tránh trùng lặp content/full_text
+            pages_result.append({
+                "page": page_num,
+                "image_size": page_res.get("image_size"),
+                "results": page_res.get("results", [])
+            })
 
         output_data = {
             "file_name": os.path.basename(pdf_path),
             "total_pages": total_pages,
-            "full_text": "\n\n--- HẾT TRANG ---\n\n".join(all_page_texts),
-            "lines": all_lines,   # Luôn cung cấp 'lines' tổng hợp để tránh KeyError
+            "content": content_by_pages,
             "pages": pages_result
         }
 
@@ -197,9 +203,27 @@ class OCRPipeline:
             return self.predict_pdf(input_path, dpi=dpi, save_json=save_json)
         else:
             res = self.predict_image(input_path)
+            output_data = {
+                "file_name": res.get("image_name"),
+                "total_pages": 1,
+                "content": [
+                    {
+                        "page": 1,
+                        "content": res.get("full_text", ""),
+                        "lines": res.get("lines", [])
+                    }
+                ],
+                "pages": [
+                    {
+                        "page": 1,
+                        "image_size": res.get("image_size"),
+                        "results": res.get("results", [])
+                    }
+                ]
+            }
             if save_json:
-                self.save_to_json(res, save_json)
-            return res
+                self.save_to_json(output_data, save_json)
+            return output_data
 
     @staticmethod
     def save_to_json(data: Dict[str, Any], json_path: str):
