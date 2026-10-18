@@ -1,3 +1,8 @@
+import PIL.Image
+# Vá lỗi tương thích cho VietOCR khi dùng Pillow >= 10.0.0
+if not hasattr(PIL.Image, "ANTIALIAS"):
+    PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
+
 import numpy as np
 from PIL import Image
 from typing import List, Union

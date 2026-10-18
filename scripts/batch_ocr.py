@@ -20,6 +20,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import PIL.Image
+if not hasattr(PIL.Image, "ANTIALIAS"):
+    PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
+
 import torch
 from pipeline.ocr_pipeline import OCRPipeline
 
@@ -39,11 +43,29 @@ def resolve_weights(yolo_arg: Optional[str], vietocr_arg: Optional[str]):
     yolo_path = yolo_arg
     vietocr_path = vietocr_arg
 
-    # 1. Kiểm tra trên Kaggle nếu chưa truyền tham số
+    # 1. Kiểm tra các đường dẫn quen thuộc trên Kaggle
+    known_yolo_paths = [
+        Path("/kaggle/input/datasets/xuanbaor/weight-yolo-vietocr/best_yolo_ep100.pt"),
+    ]
+    known_vietocr_paths = [
+        Path("/kaggle/input/datasets/xuanbaor/weight-yolo-vietocr/vgg_transformer_best.pth"),
+    ]
+
     if not yolo_path:
-        yolo_path = find_file_in_kaggle("*yolo*.pt") or find_file_in_kaggle("*.pt")
+        for p in known_yolo_paths:
+            if p.exists():
+                yolo_path = str(p)
+                break
+        if not yolo_path:
+            yolo_path = find_file_in_kaggle("*yolo*.pt") or find_file_in_kaggle("*.pt")
+
     if not vietocr_path:
-        vietocr_path = find_file_in_kaggle("*transformer*.pth") or find_file_in_kaggle("*.pth")
+        for p in known_vietocr_paths:
+            if p.exists():
+                vietocr_path = str(p)
+                break
+        if not vietocr_path:
+            vietocr_path = find_file_in_kaggle("*transformer*.pth") or find_file_in_kaggle("*.pth")
 
     # 2. Kiểm tra các thư mục weights cục bộ phổ biến
     local_weights_dir = PROJECT_ROOT / "weights"
