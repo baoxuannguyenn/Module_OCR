@@ -10,6 +10,7 @@ Script chuẩn bị dữ liệu Fine-tune cho Qwen:
 """
 
 import os
+import sys
 import re
 import json
 from pathlib import Path
@@ -271,23 +272,92 @@ def save_dataset_for_qwen(info: Dict[str, Any], dataset_dir: str = "dataset_for_
 
 
 if __name__ == "__main__":
+    import argparse
+
     project_root = Path(__file__).resolve().parents[1]
-    sample_json = project_root / "json_output" / "output.json"
-    metadata_csv = project_root / "dataset_congbao_download" / "metadata.csv"
-    dataset_dir = project_root / "dataset_for_qwen"
 
-    if sample_json.exists():
-        print(f"[*] Đang xử lý file OCR: {sample_json.name}\n")
-        info = build_qwen_input_context(str(sample_json))
+    # Tự động tìm metadata.csv (Ưu tiên HF Cache -> Kaggle Input -> local)
+    default_csv = project_root / "dataset_congbao_download" / "metadata.csv"
+    
+    # 1. Kiểm tra Hugging Face Cache
+    hf_bases = [
+        Path("/root/.cache/huggingface/hub"),
+        Path(os.path.expanduser("~/.cache/huggingface/hub"))
+    ]
+    found_hf = False
+    for hf_base in hf_bases:
+        if hf_base.exists():
+            found = list(hf_base.rglob("metadata.csv"))
+            if found:
+                default_csv = found[0]
+                found_hf = True
+                break
 
-        # Lưu vào dataset_for_qwen
-        jsonl_path, txt_path = save_dataset_for_qwen(
-            info, 
-            dataset_dir=str(dataset_dir),
-            metadata_csv_path=str(metadata_csv) if metadata_csv.exists() else None
-        )
-        print(f"\n[+] ĐÃ LƯU THÀNH CÔNG VÀO DATASET CHO QWEN:")
-        print(f"    - File TXT dễ đọc: {txt_path}")
-        print(f"    - File JSONL huấn luyện: {jsonl_path}")
-    else:
-        print(f"Không tìm thấy file: {sample_json}")
+    # 2. Kiểm tra Kaggle Input nếu chưa thấy ở HF
+    if not found_hf:
+        kaggle_csv = Path("/kaggle/input")
+        if kaggle_csv.exists():
+            found = list(kaggle_csv.rglob("metadata.csv"))
+            if found:
+                default_csv = found[0]
+
+    parser = argparse.ArgumentParser(description="Trích xuất Prompt và chuẩn bị Dataset Qwen từ file OCR JSON")
+    parser.add_argument("--json_path", type=str, default=str(project_root / "json_output"), help="Đường dẫn file .json hoặc thư mục chứa các file OCR JSON")
+    parser.add_argument("--metadata_csv", type=str, default=str(default_csv), help="Đường dẫn file metadata.csv")
+    parser.add_argument("--dataset_dir", type=str, default=str(project_root / "dataset_for_qwen"), help="Thư mục xuất dataset")
+    parser.add_argument("--reset", action="store_true", help="Xóa train.jsonl cũ trước khi sinh mới (tránh trùng lặp khi chạy lại)")
+
+    args = parser.parse_args()
+
+    input_p = Path(args.json_path)
+    csv_path = args.metadata_csv if os.path.exists(args.metadata_csv) else None
+    dataset_p = Path(args.dataset_dir)
+    dataset_p.mkdir(parents=True, exist_ok=True)
+
+    # 1. Tìm danh sách file JSON cần xử lý
+    json_files: List[Path] = []
+    if input_p.is_file() and input_p.suffix.lower() == ".json":
+        json_files = [input_p]
+    elif input_p.is_dir():
+        json_files = sorted(list(input_p.glob("*.json")))
+
+    if not json_files:
+        print(f"[!] Không tìm thấy file JSON nào tại: {input_p}")
+        sys.exit(0)
+
+    # Nếu có cờ --reset hoặc chạy batch thư mục, xóa file train.jsonl cũ để tránh duplicate
+    train_jsonl = dataset_p / "train.jsonl"
+    if args.reset and train_jsonl.exists():
+        train_jsonl.unlink()
+        print(f"[*] Đã reset file dataset cũ: {train_jsonl}")
+
+    print("=" * 60)
+    print(f"[*] BẮT ĐẦU XỬ LÝ {len(json_files)} FILE OCR JSON SANG DATASET QWEN")
+    print(f"[*] Metadata CSV: {csv_path if csv_path else 'Không tìm thấy (nhãn sẽ để null)'}")
+    print(f"[*] Thư mục đích: {dataset_p.resolve()}")
+    print("=" * 60)
+
+    success_cnt = 0
+    for idx, jf in enumerate(json_files, 1):
+        try:
+            info = build_qwen_input_context(str(jf))
+            if "error" in info:
+                print(f"[{idx}/{len(json_files)}] [!] Bỏ qua {jf.name}: {info['error']}")
+                continue
+
+            jsonl_path, txt_path = save_dataset_for_qwen(
+                info,
+                dataset_dir=str(dataset_p),
+                metadata_csv_path=csv_path
+            )
+            success_cnt += 1
+            if len(json_files) <= 10 or idx % 10 == 0 or idx == len(json_files):
+                print(f"[{idx}/{len(json_files)}] [+] Đã xử lý: {jf.name}")
+        except Exception as e:
+            print(f"[{idx}/{len(json_files)}] [!] Lỗi khi xử lý {jf.name}: {e}")
+
+    print("\n" + "=" * 60)
+    print(f"[+] HOÀN THÀNH: {success_cnt}/{len(json_files)} file đã được lưu vào:")
+    print(f"    - File JSONL huấn luyện: {dataset_p / 'train.jsonl'}")
+    print(f"    - File TXT dễ đọc:      {dataset_p}")
+    print("=" * 60)
