@@ -1,0 +1,24 @@
+# ========================================================
+# Core Dependencies for OCR Pipeline & Model Inference
+# ========================================================
+
+# YOLO Word Detector
+ultralytics>=8.0.0
+
+# VietOCR Text Recognizer
+vietocr>=0.3.12
+
+# PDF Processing (PyMuPDF)
+pymupdf>=1.23.0
+
+# Image & Data Processing
+opencv-python-headless>=4.8.0
+pillow>=9.5.0
+pyyaml>=6.0
+pandas>=2.0.0
+numpy>=1.23.0
+
+# S3 Download & Dataset Tools (Optional)
+boto3>=1.28.0
+python-dotenv>=1.0.0
+pyarrow>=12.0.0
