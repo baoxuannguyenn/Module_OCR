@@ -150,7 +150,7 @@ def build_qwen_input_context(ocr_json_path: str) -> Dict[str, Any]:
 [KHỐI CHỮ KÝ VĂN BẢN]:
 {raw_signature_text if raw_signature_text else "Không có khối chữ ký"}"""
 
-    # 4. Prompt hoàn chỉnh để Qwen tự suy luận
+    # 4. Prompt tối ưu hoàn chỉnh: Hướng dẫn chi tiết từng trường + Quy tắc lọc nhiễu + Schema JSON cố định
     full_prompt = f"""Dưới đây là nội dung trích xuất từ phần đầu và khối chữ ký của một văn bản hành chính Việt Nam. Hãy đọc kỹ ngữ cảnh và trích xuất thông tin thành một chuỗi JSON hợp lệ.
 
 NGỮ CẢNH VĂN BẢN:
@@ -158,20 +158,35 @@ NGỮ CẢNH VĂN BẢN:
 {context_text}
 \"\"\"
 
-LƯU Ý QUAN TRỌNG:
-- Bỏ qua thông tin chữ ký số điện tử của cơ quan phát hành ở đầu trang (ví dụ: "Ký bởi: CÔNG BÁO...", "Cơ quan: VĂN PHÒNG CHÍNH PHỦ...", "Ngày ký:..."). Cơ quan ban hành là cơ quan có thẩm quyền ban hành văn bản chính thức (nằm ở góc trên bên trái).
-- "cong_bao": Lấy thông tin số công báo và ngày đăng nếu có (ví dụ: "CÔNG BÁO/Số 282/Ngày 23-05-2026" hoặc "Công báo số 528..."). Nếu không có thì để null.
+QUY TẮC TRÍCH XUẤT VÀ LỌC NHIỄU:
+- Bỏ qua các dòng chữ ký số điện tử phát hành (như "Ký bởi: ...", "Cơ quan: VĂN PHÒNG CHÍNH PHỦ...", "Ngày ký: ...").
+- "co_quan_ban_hanh": Tên cơ quan ban hành văn bản chính thức ở góc trên bên trái (Ví dụ: THỦ TƯỚNG CHÍNH PHỦ, BỘ XÂY DỰNG, BỘ CÔNG AN, BỘ TƯ PHÁP, VĂN PHÒNG QUỐC HỘI...). TUYỆT ĐỐI BỎ QUA Quốc hiệu và Tiêu ngữ ("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", "Độc lập - Tự do - Hạnh phúc").
+- "ngay_ban_hanh": Là ngày tháng năm ký/ban hành văn bản ở dòng địa danh bên dưới tiêu ngữ hoặc bên cạnh số ký hiệu (Ví dụ: "Hà Nội, ngày 13 tháng 5 năm 2026" -> chuẩn hóa thành "13/05/2026"). TUYỆT ĐỐI KHÔNG lấy nhầm ngày đăng công báo.
+- "cong_bao": Thông tin số công báo và ngày đăng (Ví dụ: dòng "CÔNG BÁO/Số 282/Ngày 23-05-2026 69" -> CHỈ LẤY "CÔNG BÁO/Số 282/Ngày 23-05-2026", BỎ QUA số trang ở cuối dòng như 69, 15...). Nếu không có thì để null.
+- "nguoi_ky": Chỉ lấy họ và tên người ký chính thức ở khối chữ ký cuối văn bản (Ví dụ: "Hồ Quốc Dũng", "Phạm Gia Túc"). BỎ QUA các từ thẩm quyền/chức vụ như "KT. THỦ TƯỚNG", "PHÓ THỦ TƯỚNG", "BỘ TRƯỞNG".
 
 NHIỆM VỤ:
-Trích xuất thông tin vào JSON với các trường sau (nếu không có trong văn bản, để giá trị là null):
-1. "loai_van_ban": Loại văn bản (QUYẾT ĐỊNH, NGHỊ ĐỊNH, THÔNG TƯ, VĂN BẢN HỢP NHẤT, CHỈ THỊ...).
-2. "so_ky_hieu": Số, ký hiệu văn bản (Ví dụ: 840/QĐ-TTg, 147/2026/VBHN-LQ-VPQH...).
-3. "co_quan_ban_hanh": Cơ quan ban hành văn bản (Ví dụ: THỦ TƯỚNG CHÍNH PHỦ, BỘ XÂY DỰNG,VĂN PHÒNG QUỐC HỘI,NGÂN HÀNG NHÀ NƯỚC VIỆT NAM,...).
-4. "ngay_ban_hanh": Ngày tháng năm ban hành văn bản theo định dạng DD/MM/YYYY.
-5. "trich_yeu": Tóm tắt nội dung/tiêu đề chính của văn bản.
-6. "nguoi_ky": Họ và tên của người ký văn bản.
+Trích xuất thông tin vào duy nhất một chuỗi JSON với đầy đủ 7 trường sau (nếu trường nào không có trong văn bản, đặt giá trị là null, tuyệt đối không được thiếu bất kỳ trường nào):
+1. "loai_van_ban": Tên loại văn bản viết in hoa (Ví dụ: QUYẾT ĐỊNH, NGHỊ ĐỊNH, THÔNG TƯ, VĂN BẢN HỢP NHẤT, CHỈ THỊ...).
+2. "so_ky_hieu": Số, ký hiệu văn bản (Ví dụ: 840/QĐ-TTg, 47/2026/TT-BCA...).
+3. "co_quan_ban_hanh": Tên cơ quan ban hành chính thức.
+4. "ngay_ban_hanh": Ngày tháng năm ban hành định dạng DD/MM/YYYY.
+5. "trich_yeu": Tóm tắt tiêu đề/nội dung chính của văn bản.
+6. "nguoi_ky": Họ và tên người ký văn bản.
 7. "cong_bao": Thông tin số Công báo và ngày đăng văn bản.
-"""
+
+ĐỊNH DẠNG ĐẦU RA YÊU CẦU:
+```json
+{{
+  "loai_van_ban": "...",
+  "so_ky_hieu": "...",
+  "co_quan_ban_hanh": "...",
+  "ngay_ban_hanh": "...",
+  "trich_yeu": "...",
+  "nguoi_ky": "...",
+  "cong_bao": "..."
+}}
+```"""
 
     return {
         "file_name": file_name,
@@ -240,7 +255,7 @@ def save_dataset_for_qwen(info: Dict[str, Any], dataset_dir: str = "dataset_for_
         "messages": [
             {
                 "role": "system",
-                "content": "Bạn là chuyên gia trích xuất thông tin hành chính từ văn bản quy phạm pháp luật Việt Nam. Hãy đọc kỹ văn bản và trích xuất thông tin thành duy nhất một chuỗi JSON hợp lệ."
+                "content": "Bạn là chuyên gia trích xuất thông tin hành chính từ văn bản quy phạm pháp luật Việt Nam. Hãy đọc kỹ văn bản và trích xuất thông tin thành duy nhất một chuỗi JSON hợp lệ với đầy đủ 7 trường: loai_van_ban, so_ky_hieu, co_quan_ban_hanh, ngay_ban_hanh, trich_yeu, nguoi_ky, cong_bao."
             },
             {
                 "role": "user",
@@ -258,14 +273,10 @@ def save_dataset_for_qwen(info: Dict[str, Any], dataset_dir: str = "dataset_for_
     with open(jsonl_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(chat_sample, ensure_ascii=False) + "\n")
 
-    # Lưu thêm 1 file .txt thuần túy để người dùng dễ đọc trực quan
+    # Lưu thêm 1 file .txt thuần túy chứa đúng prompt để inference trực tiếp
     stem_name = Path(file_name).stem
     txt_path = out_dir / f"{stem_name}_context.txt"
     with open(txt_path, "w", encoding="utf-8") as f:
-        f.write("=" * 70 + "\n")
-        f.write(f"FILE NGUỒN: {file_name}\n")
-        f.write(f"KHỐI CHỮ KÝ NẰM TẠI TRANG: Trang {info.get('signature_page')}\n")
-        f.write("=" * 70 + "\n\n")
         f.write(info.get("full_prompt", ""))
 
     return str(jsonl_path), str(txt_path)
